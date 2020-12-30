@@ -60,6 +60,7 @@
   #
   # SBL:      UEFI payload for Slim Bootloader
   # COREBOOT: UEFI payload for coreboot
+  # LINUXBOOT: UEFI payload for linuxboot
   #
   DEFINE   BOOTLOADER                 = SBL
 
@@ -149,6 +150,9 @@
 
 [BuildOptions]
   *_*_*_CC_FLAGS                 = -D DISABLE_NEW_DEPRECATED_INTERFACES
+!if $(BOOTLOADER) == "LINUXBOOT"
+  *_*_*_CC_FLAGS                 = -D LINUXBOOT_PAYLOAD
+!endif
 !if $(USE_CBMEM_FOR_CONSOLE) == FALSE
   GCC:RELEASE_*_*_CC_FLAGS       = -DMDEPKG_NDEBUG
   INTEL:RELEASE_*_*_CC_FLAGS     = /D MDEPKG_NDEBUG
@@ -303,6 +307,8 @@
 !if $(UNIVERSAL_PAYLOAD) == FALSE
   !if $(BOOTLOADER) == "COREBOOT"
     BlParseLib|UefiPayloadPkg/Library/CbParseLib/CbParseLib.inf
+  !elseif $(BOOTLOADER) == "LINUXBOOT"
+    BlParseLib|UefiPayloadPkg/Library/LbParseLib/LbParseLib.inf
   !else
     BlParseLib|UefiPayloadPkg/Library/SblParseLib/SblParseLib.inf
   !endif
