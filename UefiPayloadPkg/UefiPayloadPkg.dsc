@@ -52,6 +52,8 @@
   DEFINE UNIVERSAL_PAYLOAD            = FALSE
   DEFINE UNIVERSAL_PAYLOAD_FORMAT     = ELF
 
+  DEFINE DISABLE_MMX_SSE              = TRUE
+
   #
   # NULL:    NullMemoryTestDxe
   # GENERIC: GenericMemoryTestDxe
@@ -155,6 +157,9 @@
   *_*_*_CC_FLAGS                 = -D DISABLE_NEW_DEPRECATED_INTERFACES
 !if $(BOOTLOADER) == "LINUXBOOT"
   *_*_*_CC_FLAGS                 = -D LINUXBOOT_PAYLOAD
+!endif
+!if $(DISABLE_MMX_SSE)
+  *_*_*_CC_FLAGS                 = -mno-mmx -mno-sse
 !endif
 !if $(USE_CBMEM_FOR_CONSOLE) == FALSE
   GCC:RELEASE_*_*_CC_FLAGS       = -DMDEPKG_NDEBUG
