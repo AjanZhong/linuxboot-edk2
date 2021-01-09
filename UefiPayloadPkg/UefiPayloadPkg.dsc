@@ -695,6 +695,9 @@
     <LibraryClasses>
       NestedInterruptTplLib|OvmfPkg/Library/NestedInterruptTplLib/NestedInterruptTplLib.inf
   }
+!elseif $(TIMER_SUPPORT) == "LEGACY"
+  OvmfPkg/8254TimerDxe/8254Timer.inf
+  OvmfPkg/8259InterruptControllerDxe/8259.inf
 !else
   !error "Invalid TIMER_SUPPORT"
 !endif

@@ -165,6 +165,9 @@ INF UefiCpuPkg/CpuDxe/CpuDxe.inf
 INF PcAtChipsetPkg/HpetTimerDxe/HpetTimerDxe.inf
 !elseif $(TIMER_SUPPORT) == "LAPIC"
 INF OvmfPkg/LocalApicTimerDxe/LocalApicTimerDxe.inf
+!elseif $(TIMER_SUPPORT) == "LEGACY"
+INF OvmfPkg/8254TimerDxe/8254Timer.inf
+INF OvmfPkg/8259InterruptControllerDxe/8259.inf
 !endif
 INF MdeModulePkg/Universal/Metronome/Metronome.inf
 INF MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
