@@ -92,6 +92,9 @@
   # Enabling the serial terminal will slow down the boot menu redering!
   DEFINE DISABLE_SERIAL_TERMINAL      = FALSE
 
+  # Misc
+  DEFINE INTEL_VTD_SUPPORT            = FALSE
+
   #
   #  typedef struct {
   #    UINT16  VendorId;          ///< Vendor ID to match the PCI device.  The value 0xFFFF terminates the list of entries.
@@ -783,6 +786,13 @@
 !if $(RAM_DISK_ENABLE) == TRUE
   MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
 !endif
+  #
+  # VT-d support
+  #
+!if $(INTEL_VTD_SUPPORT)
+  UefiPayloadPkg/IntelVTdDxe/IntelVTdDxe.inf
+!endif
+
   #
   # SD/eMMC Support
   #

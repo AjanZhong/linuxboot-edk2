@@ -323,6 +323,12 @@ INF MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 !endif
 !endif
 
+# Intel VT-d driver
+#
+!if $(INTEL_VTD_SUPPORT)
+INF UefiPayloadPkg/IntelVTdDxe/IntelVTdDxe.inf
+!endif
+
 #
 # Shell
 #
