@@ -550,6 +550,7 @@
   gUefiCpuPkgTokenSpaceGuid.PcdCpuMaxLogicalProcessorNumber|$(MAX_LOGICAL_PROCESSORS)
   gUefiCpuPkgTokenSpaceGuid.PcdCpuNumberOfReservedVariableMtrrs|0
   gUefiPayloadPkgTokenSpaceGuid.PcdBootloaderParameter|0
+  gUefiPayloadPkgTokenSpaceGuid.PcdVTdPolicyPropertyMask|3
 
 ################################################################################
 #
