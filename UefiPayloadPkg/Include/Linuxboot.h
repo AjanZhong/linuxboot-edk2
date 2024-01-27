@@ -38,10 +38,4 @@ typedef struct UefiPayloadConfigStruct {
 
 #define UEFI_PAYLOAD_CONFIG_VERSION 1
 
-#define LINUXBOOT_MEM_RAM 1
-#define LINUXBOOT_MEM_DEFAULT 2
-#define LINUXBOOT_MEM_ACPI 3
-#define LINUXBOOT_MEM_NVS 4
-#define LINUXBOOT_MEM_RESERVED 5
-
 #endif  // _LINUXBOOT_PEI_H_INCLUDED_

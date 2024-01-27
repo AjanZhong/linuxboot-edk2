@@ -41,10 +41,10 @@ void AddMemoryRange(IN BL_MEM_INFO_CALLBACK MemInfoCallback, IN UINTN start,
   AlignedEnd = ALIGN_VALUE(end, SIZE_4KB);
   // Conservative adjustment on Memory map. This should happen when booting from
   // non UEFI bios and it may report a memory region less than 4KB.
-  if (AlignedStart > start && type != LINUXBOOT_MEM_RAM) {
+  if (AlignedStart > start && type != 1) { // 1 == E820_RAM
     AlignedStart -= SIZE_4KB;
   }
-  if (AlignedEnd > end + 1 && type == LINUXBOOT_MEM_RAM) {
+  if (AlignedEnd > end + 1 && type == 1) {
     AlignedEnd -= SIZE_4KB;
   }
   MemoryMap.Base = AlignedStart;
