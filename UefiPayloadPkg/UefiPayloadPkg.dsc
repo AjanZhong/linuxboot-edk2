@@ -28,6 +28,7 @@
 
   DEFINE SOURCE_DEBUG_ENABLE          = FALSE
   DEFINE PS2_KEYBOARD_ENABLE          = FALSE
+  DEFINE DISABLE_MMX_SSE              = TRUE
   DEFINE RAM_DISK_ENABLE              = FALSE
   DEFINE SIO_BUS_ENABLE               = FALSE
   DEFINE SECURITY_STUB_ENABLE         = TRUE
@@ -159,6 +160,9 @@
   GCC:RELEASE_*_*_CC_FLAGS       = -DMDEPKG_NDEBUG
   INTEL:RELEASE_*_*_CC_FLAGS     = /D MDEPKG_NDEBUG
   MSFT:RELEASE_*_*_CC_FLAGS      = /D MDEPKG_NDEBUG
+!endif
+!if $(DISABLE_MMX_SSE)
+  *_*_*_CC_FLAGS                 = -mno-mmx -mno-sse
 !endif
 
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
