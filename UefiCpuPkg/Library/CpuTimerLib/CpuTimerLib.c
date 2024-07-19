@@ -30,6 +30,31 @@ InternalGetPerformanceCounterFrequency (
   VOID
   );
 
+typedef struct {
+    UINT32 eax;
+    UINT32 ebx;
+    UINT32 ecx;
+    UINT32 edx;
+} cpuid_params_t;
+
+STATIC inline VOID asm_cpuid(cpuid_params_t *cpuid_params)
+{
+    __asm__ __volatile__ (
+        "xchgl %%ebx, %1  \n\t"  // save ebx
+        "cpuid          \n\t"
+        "xchgl %%ebx, %1  \n\t"  // restore ebx
+        : "=a" (cpuid_params->eax),
+        "=r" (cpuid_params->ebx),
+        "=c" (cpuid_params->ecx),
+        "=d" (cpuid_params->edx)
+        : "a" (cpuid_params->eax),
+        "1" (cpuid_params->ebx),
+        "c" (cpuid_params->ecx),
+        "d" (cpuid_params->edx)
+        : "cc"
+        );
+}
+
 /**
   CPUID Leaf 0x15 for Core Crystal Clock Frequency.
 
@@ -48,13 +73,19 @@ CpuidCoreClockCalculateTscFrequency (
   UINT32  RegEax;
   UINT32  RegEbx;
   UINT32  RegEcx;
+  cpuid_params_t para = {0x15, 0, 0, 0};
 
   //
   // Use CPUID leaf 0x15 Time Stamp Counter and Nominal Core Crystal Clock Information
   // EBX returns 0 if not supported. ECX, if non zero, provides Core Xtal Frequency in hertz.
   // TSC frequency = (ECX, Core Xtal Frequency) * EBX/EAX.
   //
-  AsmCpuid (CPUID_TIME_STAMP_COUNTER, &RegEax, &RegEbx, &RegEcx, NULL);
+  //AsmCpuid (CPUID_TIME_STAMP_COUNTER, &RegEax, &RegEbx, &RegEcx, NULL);
+  asm_cpuid(&para);
+
+  RegEax = para.eax;
+  RegEbx = para.ebx;
+  RegEcx = para.ecx;
 
   //
   // If EAX or EBX returns 0, the XTAL ratio is not enumerated.
