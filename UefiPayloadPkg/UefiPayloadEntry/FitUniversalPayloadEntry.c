@@ -493,8 +493,9 @@ BuildHobs (
   ACPI_BOARD_INFO               *AcpiBoardInfo;
   EFI_HOB_HANDOFF_INFO_TABLE    *HobInfo;
 
-  Hob.Raw           = (UINT8 *)BootloaderParameter;
+  //Hob.Raw           = (UINT8 *)BootloaderParameter;
   MinimalNeededSize = FixedPcdGet32 (PcdSystemMemoryUefiRegionSize);
+  Hob.Raw    = (UINT8 *)(UINTN)(PcdGet32 (PcdPayloadFdMemBase) - 0x100000);
 
   ASSERT (Hob.Raw != NULL);
   ASSERT ((UINTN)Hob.HandoffInformationTable->EfiFreeMemoryTop == Hob.HandoffInformationTable->EfiFreeMemoryTop);
@@ -598,6 +599,10 @@ BuildHobs (
   return EFI_SUCCESS;
 }
 
+STATIC VOID* GetHobAddrFromBootloader(UINTN BootloaderParameter) {
+  return (VOID *)(UINTN)(PcdGet32(PcdPayloadFdMemBase) - 0x100000);
+}
+
 /**
   Entry point to the C language phase of UEFI payload.
   @param[in]   BootloaderParameter    The starting address of bootloader parameter block.
@@ -614,7 +619,13 @@ _ModuleEntryPoint (
   EFI_PEI_HOB_POINTERS        Hob;
   EFI_FIRMWARE_VOLUME_HEADER  *DxeFv;
 
-  mHobList = (VOID *)BootloaderParameter;
+  //mHobList = (VOID *)BootloaderParameter;
+  if (BootloaderParameter) {
+    mHobList = (VOID *)BootloaderParameter;
+  } else {
+    mHobList = GetHobAddrFromBootloader(BootloaderParameter);
+  }
+
   DxeFv    = NULL;
   // Call constructor for all libraries
   ProcessLibraryConstructorList ();
