@@ -150,7 +150,7 @@
   # HPET:  UEFI Payload will use HPET timer
   # LAPIC: UEFI Payload will use local APIC timer
   #
-  DEFINE TIMER_SUPPORT      = HPET
+  DEFINE TIMER_SUPPORT      = LAPIC
 
   DEFINE MULTIPLE_DEBUG_PORT_SUPPORT = FALSE
 
