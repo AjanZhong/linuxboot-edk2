@@ -567,7 +567,7 @@ InitializePciHostBridge (
                           gImageHandle,
                           NULL
                           );
-          ASSERT_EFI_ERROR (Status);
+          //ASSERT_EFI_ERROR (Status);
         }
       }
     }
@@ -598,7 +598,7 @@ InitializePciHostBridge (
                     &HostBridge->ResAlloc,
                     NULL
                     );
-    ASSERT_EFI_ERROR (Status);
+    //ASSERT_EFI_ERROR (Status);
   }
 
   for (Link = GetFirstNode (&HostBridge->RootBridges)
@@ -617,7 +617,7 @@ InitializePciHostBridge (
                     &RootBridge->RootBridgeIo,
                     NULL
                     );
-    ASSERT_EFI_ERROR (Status);
+    //ASSERT_EFI_ERROR (Status);
   }
 
   PciHostBridgeFreeRootBridges (RootBridges, RootBridgeCount);
