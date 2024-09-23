@@ -360,12 +360,21 @@ ParseFrameBuffer (
     } else if (AsciiStrCmp (TempStr, "height") == 0) {
       Data32                                        = (UINT32 *)(PropertyPtr->Data);
       GraphicsInfo->GraphicsMode.VerticalResolution = Fdt32ToCpu (*Data32);
+    } else if (AsciiStrCmp (TempStr, "pixelsperscanline") == 0) {
+      Data32                                       = (UINT32 *)(PropertyPtr->Data);
+      GraphicsInfo->GraphicsMode.PixelsPerScanLine = Fdt32ToCpu (*Data32);
     } else if (AsciiStrCmp (TempStr, "format") == 0) {
       TempStr = (CHAR8 *)(PropertyPtr->Data);
       if (AsciiStrCmp (TempStr, "a8r8g8b8") == 0) {
-        GraphicsInfo->GraphicsMode.PixelFormat = PixelRedGreenBlueReserved8BitPerColor;
+        GraphicsInfo->GraphicsMode.PixelFormat                   = PixelRedGreenBlueReserved8BitPerColor;
+        GraphicsInfo->GraphicsMode.PixelInformation.RedMask      = 0xFF0000;
+        GraphicsInfo->GraphicsMode.PixelInformation.GreenMask    = 0xFF00;
+        GraphicsInfo->GraphicsMode.PixelInformation.BlueMask     = 0xFF;
       } else if (AsciiStrCmp (TempStr, "a8b8g8r8") == 0) {
         GraphicsInfo->GraphicsMode.PixelFormat = PixelBlueGreenRedReserved8BitPerColor;
+        GraphicsInfo->GraphicsMode.PixelInformation.RedMask      = 0xFF;
+        GraphicsInfo->GraphicsMode.PixelInformation.GreenMask    = 0xFF00;
+        GraphicsInfo->GraphicsMode.PixelInformation.BlueMask     = 0xFF0000;
       } else {
         GraphicsInfo->GraphicsMode.PixelFormat = PixelFormatMax;
       }
