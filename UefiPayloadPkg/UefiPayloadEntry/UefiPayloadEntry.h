@@ -274,4 +274,15 @@ UplEntryPoint (
   IN UINTN  BootloaderParameter
   );
 
+VOID
+EFIAPI
+InitializeFloatingPointUnits (
+  VOID
+  );
+
+UINT8
+GetPhyAddrBit (
+  VOID
+  );
+
 #endif

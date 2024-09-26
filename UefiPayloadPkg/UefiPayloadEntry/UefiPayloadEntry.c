@@ -351,24 +351,13 @@ BuildGenericHob (
   VOID
   )
 {
-  UINT32                       RegEax;
   UINT8                        PhysicalAddressBits;
   EFI_RESOURCE_ATTRIBUTE_TYPE  ResourceAttribute;
 
   // The UEFI payload FV
   BuildMemoryAllocationHob (PcdGet32 (PcdPayloadFdMemBase), PcdGet32 (PcdPayloadFdMemSize), EfiBootServicesData);
 
-  //
-  // Build CPU memory space and IO space hob
-  //
-  AsmCpuid (0x80000000, &RegEax, NULL, NULL, NULL);
-  if (RegEax >= 0x80000008) {
-    AsmCpuid (0x80000008, &RegEax, NULL, NULL, NULL);
-    PhysicalAddressBits = (UINT8)RegEax;
-  } else {
-    PhysicalAddressBits = 36;
-  }
-
+  PhysicalAddressBits = GetPhyAddrBit ();
   BuildCpuHob (PhysicalAddressBits, 16);
 
   //
