@@ -225,6 +225,9 @@
   UefiCpuPkg/CpuDxeRiscV64/CpuDxeRiscV64.inf
   UefiCpuPkg/CpuMmio2Dxe/CpuMmio2Dxe.inf
 
+[Components.AARCH64]
+  UefiCpuPkg/CpuDxeAArch64/CpuDxeAArch64.inf
+
 [Components.LOONGARCH64]
   UefiCpuPkg/Library/CpuMmuLib/CpuMmuLib.inf
   UefiCpuPkg/CpuMmio2Dxe/CpuMmio2Dxe.inf
