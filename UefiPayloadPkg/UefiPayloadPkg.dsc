@@ -1183,6 +1183,7 @@
   #
   ArmPkg/Drivers/ArmPciCpuIo2Dxe/ArmPciCpuIo2Dxe.inf
   ArmPkg/Drivers/CpuDxe/CpuDxe.inf
+  UefiCpuPkg/CpuDxeAArch64/CpuDxeAArch64.inf
   ArmPkg/Library/ArmMmuLib/ArmMmuBaseLib.inf
   UefiCpuPkg/CpuIo2Dxe/CpuIo2Dxe.inf
 
