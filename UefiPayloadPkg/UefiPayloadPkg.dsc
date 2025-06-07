@@ -417,7 +417,8 @@
   DefaultExceptionHandlerLib|ArmPkg/Library/DefaultExceptionHandlerLib/DefaultExceptionHandlerLib.inf
 
   # ARM PL031 RTC Driver
-  RealTimeClockLib|ArmPlatformPkg/Library/PL031RealTimeClockLib/PL031RealTimeClockLib.inf
+  #RealTimeClockLib|ArmPlatformPkg/Library/PL031RealTimeClockLib/PL031RealTimeClockLib.inf
+  RealTimeClockLib|EmbeddedPkg/Library/VirtualRealTimeClockLib/VirtualRealTimeClockLib.inf
   TimeBaseLib|EmbeddedPkg/Library/TimeBaseLib/TimeBaseLib.inf
 
   DebugLib|MdePkg/Library/BaseDebugLibSerialPort/BaseDebugLibSerialPort.inf
@@ -673,6 +674,8 @@
   # AARCH64 use PL011 Serial Port device instead of UniversalPayload Serial
   gUefiPayloadPkgTokenSpaceGuid.PcdUseUniversalPayloadSerialPort|FALSE
 
+  gEfiMdeModulePkgTokenSpaceGuid.PcdEmuVariableNvModeEnable      |TRUE
+
 [PcdsPatchableInModule.IA32, PcdsPatchableInModule.X64]
 !if $(NETWORK_DRIVER_ENABLE) == TRUE
   gEfiNetworkPkgTokenSpaceGuid.PcdAllowHttpConnections|TRUE
@@ -810,12 +813,15 @@
 
 [PcdsDynamicExDefault.AARCH64]
 
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase     | 0
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64   | 0
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase64   | 0
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase     | 0
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase   | 0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase     | 0x04000000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize     | 0x00040000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase   | 0x04040000
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase64 | 0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize   | 0x00040000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase     | 0x04080000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64   | 0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize     | 0x00040000
 
   # Timer IRQs
   gArmTokenSpaceGuid.PcdArmArchTimerSecIntrNum|29
@@ -1092,30 +1098,6 @@
 !endif
 !endif
 
-!if $(VARIABLE_SUPPORT) == "EMU"
-  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
-!elseif $(VARIABLE_SUPPORT) == "SMMSTORE"
-  UefiPayloadPkg/SmmStoreFvb/SmmStoreFvbRuntimeDxe.inf
-  MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
-  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf {
-    <LibraryClasses>
-      NULL|MdeModulePkg/Library/VarCheckUefiLib/VarCheckUefiLib.inf
-      NULL|EmbeddedPkg/Library/NvVarStoreFormattedLib/NvVarStoreFormattedLib.inf
-  }
-!elseif $(VARIABLE_SUPPORT) == "SPI"
-  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmm.inf {
-    <LibraryClasses>
-      NULL|MdeModulePkg/Library/VarCheckUefiLib/VarCheckUefiLib.inf
-      NULL|MdeModulePkg/Library/VarCheckHiiLib/VarCheckHiiLib.inf
-      NULL|MdeModulePkg/Library/VarCheckPcdLib/VarCheckPcdLib.inf
-      NULL|MdeModulePkg/Library/VarCheckPolicyLib/VarCheckPolicyLib.inf
-  }
-
-  UefiPayloadPkg/FvbRuntimeDxe/FvbSmm.inf
-  MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteSmm.inf
-  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmmRuntimeDxe.inf
-!endif
-
   #
   # Misc
   #
@@ -1142,6 +1124,31 @@
 !else
   !error "Invalid TIMER_SUPPORT"
 !endif
+
+!if $(VARIABLE_SUPPORT) == "EMU"
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+!elseif $(VARIABLE_SUPPORT) == "SMMSTORE"
+  UefiPayloadPkg/SmmStoreFvb/SmmStoreFvbRuntimeDxe.inf
+  MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf {
+    <LibraryClasses>
+      NULL|MdeModulePkg/Library/VarCheckUefiLib/VarCheckUefiLib.inf
+      NULL|EmbeddedPkg/Library/NvVarStoreFormattedLib/NvVarStoreFormattedLib.inf
+  }
+!elseif $(VARIABLE_SUPPORT) == "SPI"
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmm.inf {
+    <LibraryClasses>
+      NULL|MdeModulePkg/Library/VarCheckUefiLib/VarCheckUefiLib.inf
+      NULL|MdeModulePkg/Library/VarCheckHiiLib/VarCheckHiiLib.inf
+      NULL|MdeModulePkg/Library/VarCheckPcdLib/VarCheckPcdLib.inf
+      NULL|MdeModulePkg/Library/VarCheckPolicyLib/VarCheckPolicyLib.inf
+  }
+
+  UefiPayloadPkg/FvbRuntimeDxe/FvbSmm.inf
+  MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteSmm.inf
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmmRuntimeDxe.inf
+!endif
+
 
 [Components.AARCH64]
   ArmPkg/Drivers/ArmPciCpuIo2Dxe/ArmPciCpuIo2Dxe.inf
@@ -1194,6 +1201,14 @@
 
   # ACPI Support
   OvmfPkg/PlatformHasAcpiDtDxe/PlatformHasAcpiDtDxe.inf
+
+!if $(VARIABLE_SUPPORT) == "EMU"
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+!elseif $(VARIABLE_SUPPORT) == "SPI"
+  MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+  MdeModulePkg/Universal/FvSimpleFileSystemDxe/FvSimpleFileSystemDxe.inf
+!endif
 
   #------------------------------
   #  Build the shell

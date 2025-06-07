@@ -170,12 +170,25 @@ INF MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntime
   !elseif $(TIMER_SUPPORT) == "LAPIC"
     INF OvmfPkg/LocalApicTimerDxe/LocalApicTimerDxe.inf
   !endif
+
+  !if $(VARIABLE_SUPPORT) == "EMU"
+    INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+  !elseif $(VARIABLE_SUPPORT) == "SMMSTORE"
+    INF UefiPayloadPkg/SmmStoreFvb/SmmStoreFvbRuntimeDxe.inf
+    INF MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
+    INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+  !elseif $(VARIABLE_SUPPORT) == "SPI"
+    INF UefiPayloadPkg/FvbRuntimeDxe/FvbSmm.inf
+    INF MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteSmm.inf
+    INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmm.inf
+    INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmmRuntimeDxe.inf
+  !endif
+
 !elseif "AARCH64" IN "$(ARCH)"
   INF ArmPkg/Drivers/CpuDxe/CpuDxe.inf
   INF ArmPkg/Drivers/ArmGicDxe/ArmGicDxe.inf
   INF ArmPkg/Drivers/TimerDxe/TimerDxe.inf
 
-  INF EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
   INF EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
   INF OvmfPkg/PlatformHasAcpiDtDxe/PlatformHasAcpiDtDxe.inf
   INF UefiCpuPkg/CpuMmio2Dxe/CpuMmio2Dxe.inf
@@ -186,6 +199,16 @@ INF MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntime
 
   INF OvmfPkg/QemuRamfbDxe/QemuRamfbDxe.inf
   INF OvmfPkg/PlatformDxe/Platform.inf
+
+  !if $(VARIABLE_SUPPORT) == "EMU"
+  INF  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+  !elseif $(VARIABLE_SUPPORT) == "SPI"
+  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+  INF MdeModulePkg/Universal/FvSimpleFileSystemDxe/FvSimpleFileSystemDxe.inf
+  !endif
+
+  INF EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
+
 !endif
 
 !if $(SECURITY_STUB_ENABLE) == TRUE
@@ -221,18 +244,6 @@ INF MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
 !endif
 !endif
 
-!if $(VARIABLE_SUPPORT) == "EMU"
-  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
-!elseif $(VARIABLE_SUPPORT) == "SMMSTORE"
-  INF UefiPayloadPkg/SmmStoreFvb/SmmStoreFvbRuntimeDxe.inf
-  INF MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
-  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
-!elseif $(VARIABLE_SUPPORT) == "SPI"
-  INF UefiPayloadPkg/FvbRuntimeDxe/FvbSmm.inf
-  INF MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteSmm.inf
-  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmm.inf
-  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmmRuntimeDxe.inf
-!endif
 
 !if $(UNIVERSAL_PAYLOAD) == FALSE
   !if $(SECURE_BOOT_ENABLE) == TRUE

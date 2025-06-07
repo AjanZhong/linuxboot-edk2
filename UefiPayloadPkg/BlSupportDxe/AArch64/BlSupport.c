@@ -57,6 +57,11 @@ BlUpdateMemoryMap (
     ASSERT (Idx <= MAX_DESCRIPTORS);
   }
 
+  VirtualMemoryTable[Idx].PhysicalBase = 0x4000000;
+  VirtualMemoryTable[Idx].VirtualBase  = 0x4000000;
+  VirtualMemoryTable[Idx].Length       = 0x100000;
+  VirtualMemoryTable[Idx].Attributes = ARM_MEMORY_REGION_ATTRIBUTE_DEVICE;
+
   Status = ArmConfigureMmu (VirtualMemoryTable, &TranslationTableBase, &TranslationTableSize);
   ASSERT_EFI_ERROR (Status);
 
