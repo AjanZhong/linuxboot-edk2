@@ -721,6 +721,10 @@ GicV3ExitBootServicesEvent (
   )
 {
   UINTN  Index;
+  UINT32 GicrCtrl;
+  UINT64 TypeRegister;
+  UINTN  GicCpuRedistributorBase;
+  EFI_STATUS  Status;
 
   // Acknowledge all pending interrupts in SPI range.
   for (Index = 0; Index <= mGicMaxSpiIntId; Index++) {
@@ -737,6 +741,51 @@ GicV3ExitBootServicesEvent (
 
   // Disable Gic Distributor
   ArmGicDisableDistributor (mGicDistributorBase);
+
+  GicCpuRedistributorBase = mGicRedistributorBase;
+
+  Index = 0;
+  do {
+    DEBUG((DEBUG_INFO, "%a - %d GICR base:%llx\n", __FUNCTION__, __LINE__, GicCpuRedistributorBase));
+    Status = gCpuArch->SetMemoryAttributes (
+                         gCpuArch,
+                         GicCpuRedistributorBase,
+                         GIC_V3_REDISTRIBUTOR_GRANULARITY,
+                         EFI_MEMORY_UC | EFI_MEMORY_XP
+                         );
+    if (EFI_ERROR (Status)) {
+      DEBUG ((
+        DEBUG_ERROR,
+        "%a: Failed to map GICv3 redistributor MMIO interface at 0x%lx: %r\n",
+        __func__,
+        GicCpuRedistributorBase,
+        Status
+        ));
+      ASSERT_EFI_ERROR (Status);
+      return;
+    }
+
+    TypeRegister = MmioRead64 (GicCpuRedistributorBase + ARM_GICR_TYPER);
+    DEBUG((DEBUG_INFO, "%a - %d type:%llx\n", __FUNCTION__, __LINE__, TypeRegister));
+    GicrCtrl = MmioRead32(GicCpuRedistributorBase);
+    DEBUG((DEBUG_INFO, "%a - %d Index:%d GICR ctrl info:%x, clearing EnableLPIs bit\n", __FUNCTION__, __LINE__, Index, GicrCtrl));
+    GicrCtrl &= ~0x1;
+    DEBUG((DEBUG_INFO, "%a - %d Index:%d try to set GICR ctrl :%x\n", __FUNCTION__, __LINE__, Index, GicrCtrl));
+    MmioWrite32 (GicCpuRedistributorBase, GicrCtrl);
+
+    // Move to the next GIC Redistributor frame.
+    // The GIC specification does not forbid a mixture of redistributors
+    // with or without support for virtual LPIs, so we test Virtual LPIs
+    // Support (VLPIS) bit for each frame to decide the granularity.
+    // Note: The assumption here is that the redistributors are adjacent
+    // for all CPUs. However this may not be the case for NUMA systems.
+    GicCpuRedistributorBase += (((ARM_GICR_TYPER_VLPIS & TypeRegister) != 0)
+                                ? GIC_V4_REDISTRIBUTOR_GRANULARITY
+                                : GIC_V3_REDISTRIBUTOR_GRANULARITY);
+	Index++;
+  } while ((TypeRegister & ARM_GICR_TYPER_LAST) == 0);
+
+
 }
 
 /**
