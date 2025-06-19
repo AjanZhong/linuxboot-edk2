@@ -53,6 +53,7 @@
 [Guids]
   gUefiAcpiBoardInfoGuid
   gEfiGraphicsInfoHobGuid
+  gUniversalPayloadSystemTableBaseGuid
 
 [Protocols]
   gEfiCpuArchProtocolGuid

@@ -15,11 +15,63 @@
 #include <Library/HobLib.h>
 #include <Library/PcdLib.h>
 #include <Protocol/Cpu.h>
-
+#include <Guid/UniversalPayloadSystemTableBase.h>
 #include "BlSupportDxe.h"
 
 #define MAX_DESCRIPTORS  256
 ARM_MEMORY_REGION_DESCRIPTOR  VirtualMemoryTable[MAX_DESCRIPTORS];
+
+STATIC UNIVERSAL_PAYLOAD_SYSTEM_TABLE_BASE *mBaseSystemTable;
+STATIC EFI_SYSTEM_TABLE *mSystemTable;
+STATIC EFI_EVENT        mEfiExitBootServicesEvent;
+
+STATIC
+VOID
+EFIAPI
+BlSystemTableExitBootServicesEvent (
+  IN EFI_EVENT  Event,
+  IN VOID       *Context
+  )
+{
+  EFI_SYSTEM_TABLE *Table = (EFI_SYSTEM_TABLE *)mBaseSystemTable->SystemTableBase;
+  DEBUG ((DEBUG_INFO, "%a - %d invoked. Runtime:%llx\n", __FUNCTION__, __LINE__, mSystemTable->RuntimeServices));
+  mSystemTable->RuntimeServices = (EFI_RUNTIME_SERVICES *)Table->RuntimeServices;
+  DEBUG ((DEBUG_INFO, "%a - %d invoked. Runtime:%llx\n", __FUNCTION__, __LINE__, mSystemTable->RuntimeServices));
+}
+
+STATIC EFI_STATUS
+BlSystemTableBaseConstructor (
+  IN EFI_SYSTEM_TABLE  *Table
+)
+{
+  EFI_STATUS                   Status;
+  UINT8                        *GuidHob;
+
+  mSystemTable = Table;
+  DEBUG ((DEBUG_INFO, "%a - %d invoked. SystemTable:%llx\n", __FUNCTION__, __LINE__, mSystemTable));
+  // Get System Table Base Address
+  GuidHob = GetFirstGuidHob (&gUniversalPayloadSystemTableBaseGuid);
+  if (GuidHob == NULL) {
+	  return EFI_NOT_FOUND;
+  }
+
+  mBaseSystemTable = (UNIVERSAL_PAYLOAD_SYSTEM_TABLE_BASE *)GET_GUID_HOB_DATA (GuidHob);
+  ASSERT (mBaseSystemTable != NULL);
+  ASSERT (mBaseSystemTable->SystemTableBase != 0);
+  DEBUG (( DEBUG_INFO, "Base SystemTable:%llx, SystemTableBase:%llx\n", mBaseSystemTable, mBaseSystemTable->SystemTableBase));
+
+  // Register for an ExitBootServicesEvent
+  Status = gBS->CreateEvent (
+                  EVT_SIGNAL_EXIT_BOOT_SERVICES,
+                  TPL_NOTIFY,
+                  BlSystemTableExitBootServicesEvent,
+                  NULL,
+                  &mEfiExitBootServicesEvent
+                  );
+  ASSERT_EFI_ERROR (Status);
+
+  return Status;
+}
 
 STATIC
 EFI_STATUS
@@ -96,6 +148,8 @@ BlArchAdditionalOps (
       return Status;
     }
   }
+
+  BlSystemTableBaseConstructor(SystemTable); 
 
   return Status;
 }
