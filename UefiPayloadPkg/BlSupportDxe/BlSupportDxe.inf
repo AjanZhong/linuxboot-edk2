@@ -42,9 +42,14 @@
 [LibraryClasses]
   UefiDriverEntryPoint
   UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  UefiLib
   DebugLib
   BaseMemoryLib
+  MemoryAllocationLib
   HobLib
+  BaseLib
+  FdtLib
 
 [LibraryClasses.AARCH64]
   ArmMmuLib
@@ -52,6 +57,8 @@
 [Guids]
   gUefiAcpiBoardInfoGuid
   gEfiGraphicsInfoHobGuid
+  gUniversalPayloadDeviceTreeGuid
+  gEfiEventExitBootServicesGuid
 
 [Protocols]
   gEfiCpuArchProtocolGuid

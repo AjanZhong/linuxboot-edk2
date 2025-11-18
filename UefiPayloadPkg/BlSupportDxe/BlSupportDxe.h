@@ -12,13 +12,23 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <PiDxe.h>
 
 #include <Library/UefiBootServicesTableLib.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
+#include <Library/UefiLib.h>
 #include <Library/DebugLib.h>
 #include <Library/BaseMemoryLib.h>
+#include <Library/MemoryAllocationLib.h>
 #include <Library/IoLib.h>
 #include <Library/HobLib.h>
+#include <Library/BaseLib.h>
+#include <Library/FdtLib.h>
 
 #include <Guid/AcpiBoardInfoGuid.h>
 #include <Guid/GraphicsInfoHob.h>
+#include <Guid/EventGroup.h>
+#include <UniversalPayload/DeviceTree.h>
+#include <Protocol/Variable.h>
+
+#define U_ROOT_EFIVAR_MAGIC  "u-root-efivar-v1"
 
 EFI_STATUS
 EFIAPI

@@ -9,6 +9,7 @@
 #include <Guid/MemoryTypeInformation.h>
 #include <Library/FdtParserLib.h>
 #include <Library/HobParserLib.h>
+#include <UniversalPayload/DeviceTree.h>
 
 #define MEMORY_ATTRIBUTE_MASK  (EFI_RESOURCE_ATTRIBUTE_PRESENT             |        \
                                        EFI_RESOURCE_ATTRIBUTE_INITIALIZED         | \
@@ -408,7 +409,8 @@ CreatNewHobForHoblist (
 
 /**
   It will build HOBs based on information from bootloaders.
-  @param[in]  NewFdtBase     The pointer to New FdtBase.
+  @param[in]  NewFdtBase     The pointer to New FdtBase (reserved memory address).
+  @param[in]  OriginalFdtBase The pointer to original FDT base from bootloader.
   @param[out] DxeFv          The pointer to the DXE FV in memory.
   @retval EFI_SUCCESS        If it completed successfully.
   @retval Others             If it failed to build required HOBs.
@@ -416,6 +418,7 @@ CreatNewHobForHoblist (
 EFI_STATUS
 FitBuildHobs (
   IN  UINTN                       NewFdtBase,
+  IN  VOID                        *OriginalFdtBase,
   OUT EFI_FIRMWARE_VOLUME_HEADER  **DxeFv
   )
 {
@@ -425,6 +428,27 @@ FitBuildHobs (
   UNIVERSAL_PAYLOAD_ACPI_TABLE   *AcpiTable;
   ACPI_BOARD_INFO                *AcpiBoardInfo;
   UNIVERSAL_PAYLOAD_DEVICE_TREE  *Fdt;
+
+  //
+  // Create or update device tree HOB
+  //
+  GuidHob = GetFirstGuidHob (&gUniversalPayloadDeviceTreeGuid);
+  if (GuidHob == NULL) {
+    //
+    // Device tree HOB doesn't exist, create it
+    //
+    if (OriginalFdtBase != NULL) {
+      if (FdtCheckHeader (OriginalFdtBase) == 0) {
+        Fdt = BuildGuidHob (&gUniversalPayloadDeviceTreeGuid, sizeof (UNIVERSAL_PAYLOAD_DEVICE_TREE));
+        if (Fdt != NULL) {
+          Fdt->Header.Revision = UNIVERSAL_PAYLOAD_DEVICE_TREE_REVISION;
+          Fdt->Header.Length   = (UINT16)sizeof (UNIVERSAL_PAYLOAD_DEVICE_TREE);
+          Fdt->DeviceTreeAddress = (EFI_PHYSICAL_ADDRESS)(UINTN)OriginalFdtBase;
+          DEBUG ((DEBUG_INFO, "Create device tree HOB at 0x%p\n", OriginalFdtBase));
+        }
+      }
+    }
+  }
 
   if (FixedPcdGetBool (PcdHandOffFdtEnable)) {
     //
@@ -437,7 +461,7 @@ FitBuildHobs (
         if (Fdt != NULL) {
           DEBUG ((DEBUG_INFO, "Update FDT base to reserved memory\n"));
           FdtSize = PcdGet8 (PcdFDTPageSize) * EFI_PAGE_SIZE;
-          CopyMem ((VOID *)NewFdtBase, (VOID *)(Fdt->DeviceTreeAddress), FdtSize);
+          CopyMem ((VOID *)NewFdtBase, (VOID *)(UINTN)Fdt->DeviceTreeAddress, FdtSize);
           Fdt->DeviceTreeAddress = NewFdtBase;
         }
       }
@@ -506,6 +530,7 @@ FitUplEntryPoint (
   VOID              *FdtBase;
  #endif
   VOID  *FdtBaseResvd;
+  VOID  *OriginalFdtBase;
 
   if (FixedPcdGetBool (PcdHandOffFdtEnable)) {
     mHobList = (VOID *)NULL;
@@ -515,6 +540,7 @@ FitUplEntryPoint (
 
   DxeFv        = NULL;
   FdtBaseResvd = 0;
+  OriginalFdtBase = NULL;
   // Call constructor for all libraries
   ProcessLibraryConstructorList ();
 
@@ -534,15 +560,17 @@ FitUplEntryPoint (
     if (FdtCheckHeader (FdtBase) == 0) {
       CustomFdtNodeParser ((VOID *)FdtBase, (VOID *)HobListPtr);
       FdtBaseResvd = PayloadAllocatePages (PcdGet8 (PcdFDTPageSize), EfiReservedMemoryType);
+      OriginalFdtBase = FdtBase;
     }
   }
-
  #else
   CreatNewHobForHoblist (BootloaderParameter);
+  // When PcdHandOffFdtEnable is FALSE, BootloaderParameter is the FDT base
+  OriginalFdtBase = (VOID *)BootloaderParameter;
  #endif
 
   // Build HOB based on information from Bootloader
-  Status = FitBuildHobs ((UINTN)FdtBaseResvd, &DxeFv);
+  Status = FitBuildHobs ((UINTN)FdtBaseResvd, OriginalFdtBase, &DxeFv);
 
   // Call constructor for all libraries again since hobs were built
   ProcessLibraryConstructorList ();
