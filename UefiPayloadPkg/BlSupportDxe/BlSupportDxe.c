@@ -8,7 +8,9 @@
 **/
 #include "BlSupportDxe.h"
 
-STATIC BOOLEAN  mVariableRestoreDone = FALSE;
+STATIC BOOLEAN               mVariableRestoreDone = FALSE;
+STATIC CACHED_VARIABLE_DATA  *mCachedVariables    = NULL;
+STATIC UINTN                 mCachedVariableCount = 0;
 
 /**
   Convert ASCII string to Unicode string.
@@ -48,20 +50,22 @@ AsciiToUnicodeString (
 }
 
 /**
-  Parse a device tree node and restore the EFI variable if it contains
+  Parse a device tree node and cache the EFI variable data if it contains
   u-root EFI variable information.
 
   @param[in]  FdtBase    Pointer to the device tree base.
   @param[in]  Node       Device tree node offset.
+  @param[out] CachedVar  Pointer to store the cached variable data.
 
-  @retval EFI_SUCCESS    The variable was successfully restored or skipped.
-  @retval Other          Error occurred during parsing or restoration.
+  @retval EFI_SUCCESS    The variable was successfully cached or skipped.
+  @retval Other          Error occurred during parsing.
 
 **/
 EFI_STATUS
-ParseEfiVariableNode (
-  IN VOID   *FdtBase,
-  IN INT32  Node
+ParseAndCacheEfiVariableNode (
+  IN  VOID                  *FdtBase,
+  IN  INT32                 Node,
+  OUT CACHED_VARIABLE_DATA  *CachedVar
   )
 {
   EFI_STATUS        Status;
@@ -210,84 +214,39 @@ ParseEfiVariableNode (
   DataPtr  = (CONST UINT8 *)PropertyPtr->Data;
   DataSize = TempLen;
 
-  // Allocate buffer for variable data
+  // Allocate buffer for variable data (persistent allocation)
   VariableData = AllocatePool (DataSize);
   if (VariableData == NULL) {
     DEBUG ((DEBUG_ERROR, "BlSupportDxe: Failed to allocate memory for variable data\n"));
     FreePool (VariableName);
+    if (TempNameStr != NULL) {
+      FreePool (TempNameStr);
+    }
+    if (TempGuidStr != NULL) {
+      FreePool (TempGuidStr);
+    }
     return EFI_OUT_OF_RESOURCES;
   }
 
   CopyMem (VariableData, DataPtr, DataSize);
 
-  // Check if variable already exists - if it does with different attributes, delete it first
-  {
-    UINTN       ExistingDataSize = 0;
-    UINT32      ExistingAttributes;
-    EFI_STATUS  GetStatus;
+  // Store in cached variable structure
+  CachedVar->VariableName = VariableName;
+  CopyMem (&CachedVar->VariableGuid, &VariableGuid, sizeof (EFI_GUID));
+  CachedVar->Attributes = Attributes;
+  CachedVar->DataSize   = DataSize;
+  CachedVar->Data       = VariableData;
 
-    GetStatus = gRT->GetVariable (
-                        VariableName,
-                        &VariableGuid,
-                        &ExistingAttributes,
-                        &ExistingDataSize,
-                        NULL
-                        );
-    if (!EFI_ERROR (GetStatus)) {
-      // Variable exists - check if attributes match
-      if ((Attributes != 0) && ((Attributes & (~EFI_VARIABLE_APPEND_WRITE)) != ExistingAttributes)) {
-        DEBUG ((
-          DEBUG_INFO,
-          "BlSupportDxe: Variable %a exists with different attributes (0x%x vs 0x%x), deleting first\n",
-          NameStr,
-          ExistingAttributes,
-          Attributes
-          ));
-        // Delete the existing variable first
-        gRT->SetVariable (
-          VariableName,
-          &VariableGuid,
-          0,
-          0,
-          NULL
-          );
-      }
-    }
-  }
+  DEBUG ((
+    DEBUG_INFO,
+    "BlSupportDxe: Cached variable %a (GUID: %g, Attr: 0x%x, Size: %d)\n",
+    NameStr,
+    &CachedVar->VariableGuid,
+    Attributes,
+    DataSize
+    ));
 
-  // Set the EFI variable
-  Status = gRT->SetVariable (
-                  VariableName,
-                  &VariableGuid,
-                  Attributes,
-                  DataSize,
-                  VariableData
-                  );
-
-  if (EFI_ERROR (Status)) {
-    DEBUG ((
-      DEBUG_ERROR,
-      "BlSupportDxe: Failed to set variable %a (GUID: %g, Attr: 0x%x, Size: %d): %r\n",
-      NameStr,
-      &VariableGuid,
-      Attributes,
-      DataSize,
-      Status
-      ));
-  } else {
-    DEBUG ((
-      DEBUG_INFO,
-      "BlSupportDxe: Successfully restored variable %a (GUID: %g, Attr: 0x%x, Size: %d)\n",
-      NameStr,
-      &VariableGuid,
-      Attributes,
-      DataSize
-      ));
-  }
-
-  // Clean up
-  FreePool (VariableName);
-  FreePool (VariableData);
+  // Clean up temporary buffers
   if (TempNameStr != NULL) {
     FreePool (TempNameStr);
   }
@@ -295,29 +254,30 @@ ParseEfiVariableNode (
     FreePool (TempGuidStr);
   }
 
-  return Status;
+  return EFI_SUCCESS;
 }
 
 /**
-  Parse all device tree nodes and restore EFI variables from u-root.
+  Parse all device tree nodes and cache EFI variables from u-root.
 
   @param[in]  FdtBase    Pointer to the device tree base.
 
-  @retval EFI_SUCCESS    All variables were processed (some may have failed).
+  @retval EFI_SUCCESS    All variables were cached successfully.
   @retval Other          Error occurred during parsing.
 
 **/
 EFI_STATUS
-ParseDeviceTreeForVariables (
+CacheDeviceTreeVariables (
   IN VOID  *FdtBase
   )
 {
-  INT32                Node;
-  INT32                Depth;
-  EFI_STATUS           Status;
-  UINTN                VariableCount;
-  CONST FDT_PROPERTY   *PropertyPtr;
-  INT32                TempLen;
+  INT32                 Node;
+  INT32                 Depth;
+  EFI_STATUS            Status;
+  UINTN                 VariableCount;
+  UINTN                 MaxVariables;
+  CONST FDT_PROPERTY    *PropertyPtr;
+  INT32                 TempLen;
 
   if (FdtBase == NULL) {
     return EFI_INVALID_PARAMETER;
@@ -325,41 +285,68 @@ ParseDeviceTreeForVariables (
 
   // Validate FDT header
   if (FdtCheckHeader (FdtBase) != 0) {
-    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Invalid FDT header\n"));
     return EFI_INVALID_PARAMETER;
   }
 
   DEBUG ((DEBUG_INFO, "BlSupportDxe: Starting device tree parsing for EFI variables\n"));
   DEBUG ((DEBUG_INFO, "BlSupportDxe: Device tree base: 0x%p\n", FdtBase));
 
+  // First pass: count variables
   VariableCount = 0;
-
-  // Walk through all nodes in the device tree
-  Depth = 0;
+  Depth         = 0;
   for (Node = FdtNextNode (FdtBase, 0, &Depth); Node >= 0; Node = FdtNextNode (FdtBase, Node, &Depth)) {
-    // Check if this node has a "magic" property
     PropertyPtr = FdtGetProperty (FdtBase, Node, "magic", &TempLen);
     if (PropertyPtr != NULL) {
-      DEBUG ((DEBUG_INFO, "BlSupportDxe: Found node with magic property (len=%d)\n", TempLen));
+      CONST CHAR8  *MagicStr = (CONST CHAR8 *)PropertyPtr->Data;
+      UINTN        MagicLen  = AsciiStrLen (U_ROOT_EFIVAR_MAGIC);
+      if (((TempLen == MagicLen) || (TempLen == (MagicLen + 1))) &&
+          (AsciiStrnCmp (MagicStr, U_ROOT_EFIVAR_MAGIC, MagicLen) == 0))
+      {
+        VariableCount++;
+      }
     }
-    Status = ParseEfiVariableNode (FdtBase, Node);
+  }
+
+  if (VariableCount == 0) {
+    DEBUG ((DEBUG_INFO, "BlSupportDxe: No EFI variables found in device tree\n"));
+    return EFI_SUCCESS;
+  }
+
+  DEBUG ((DEBUG_INFO, "BlSupportDxe: Found %d EFI variable nodes\n", VariableCount));
+
+  // Allocate cache array
+  MaxVariables     = VariableCount;
+  mCachedVariables = AllocateZeroPool (MaxVariables * sizeof (CACHED_VARIABLE_DATA));
+  if (mCachedVariables == NULL) {
+    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Failed to allocate cache for %d variables\n", MaxVariables));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  // Second pass: cache variables
+  VariableCount = 0;
+  Depth         = 0;
+  for (Node = FdtNextNode (FdtBase, 0, &Depth); Node >= 0; Node = FdtNextNode (FdtBase, Node, &Depth)) {
+    if (VariableCount >= MaxVariables) {
+      break;
+    }
+
+    Status = ParseAndCacheEfiVariableNode (FdtBase, Node, &mCachedVariables[VariableCount]);
     if (Status == EFI_SUCCESS) {
       VariableCount++;
     } else if (Status != EFI_NOT_FOUND) {
-      // Log errors other than "not found" (which is expected for most nodes)
-      DEBUG ((DEBUG_WARN, "BlSupportDxe: Error parsing node: %r\n", Status));
+      DEBUG ((DEBUG_WARN, "BlSupportDxe: Error caching variable node: %r\n", Status));
     }
-    // Continue parsing other nodes even if one fails
   }
 
-  DEBUG ((DEBUG_INFO, "BlSupportDxe: Restored %d EFI variables from device tree\n", VariableCount));
+  mCachedVariableCount = VariableCount;
+  DEBUG ((DEBUG_INFO, "BlSupportDxe: Cached %d EFI variables from device tree\n", mCachedVariableCount));
 
   return EFI_SUCCESS;
 }
 
 /**
   Callback function for ExitBootServices event.
-  This function restores EFI variables from u-root device tree nodes.
+  This function restores EFI variables from cached data.
 
   @param[in]  Event       Event whose notification function is being invoked.
   @param[in]  Context     Pointer to the notification function's context.
@@ -372,47 +359,99 @@ OnExitBootServices (
   IN VOID       *Context
   )
 {
-  EFI_HOB_GUID_TYPE              *GuidHob;
-  UNIVERSAL_PAYLOAD_DEVICE_TREE  *DeviceTree;
-  VOID                           *FdtBase;
-  EFI_STATUS                     Status;
+  EFI_STATUS  Status;
+  UINTN       Index;
+  UINTN       SuccessCount;
 
   if (mVariableRestoreDone) {
+    DEBUG ((DEBUG_INFO, "BlSupportDxe: Variable restoration already done\n"));
     return;
   }
 
-  DEBUG ((DEBUG_INFO, "BlSupportDxe: ExitBootServices event triggered, restoring variables from device tree\n"));
+  DEBUG ((DEBUG_INFO, "BlSupportDxe: ExitBootServices event triggered, restoring %d cached variables\n", mCachedVariableCount));
 
-  // Get device tree from HOB
-  GuidHob = GetFirstGuidHob (&gUniversalPayloadDeviceTreeGuid);
-  if (GuidHob == NULL) {
-    DEBUG ((DEBUG_WARN, "BlSupportDxe: Device tree HOB not found\n"));
+  if ((mCachedVariables == NULL) || (mCachedVariableCount == 0)) {
+    DEBUG ((DEBUG_INFO, "BlSupportDxe: No cached variables to restore\n"));
+    mVariableRestoreDone = TRUE;
+    gBS->CloseEvent (Event);
     return;
   }
 
-  DeviceTree = (UNIVERSAL_PAYLOAD_DEVICE_TREE *)GET_GUID_HOB_DATA (GuidHob);
-  if (DeviceTree == NULL) {
-    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Invalid device tree HOB data\n"));
-    return;
+  SuccessCount = 0;
+
+  // Restore all cached variables
+  for (Index = 0; Index < mCachedVariableCount; Index++) {
+    CACHED_VARIABLE_DATA  *CachedVar = &mCachedVariables[Index];
+
+    // Check if variable already exists - if it does with different attributes, delete it first
+    {
+      UINTN       ExistingDataSize = 0;
+      UINT32      ExistingAttributes;
+      EFI_STATUS  GetStatus;
+
+      GetStatus = gRT->GetVariable (
+                          CachedVar->VariableName,
+                          &CachedVar->VariableGuid,
+                          &ExistingAttributes,
+                          &ExistingDataSize,
+                          NULL
+                          );
+      if (!EFI_ERROR (GetStatus)) {
+        // Variable exists - check if attributes match
+        if ((CachedVar->Attributes != 0) && ((CachedVar->Attributes & (~EFI_VARIABLE_APPEND_WRITE)) != ExistingAttributes)) {
+          DEBUG ((
+            DEBUG_INFO,
+            "BlSupportDxe: Variable exists with different attributes (0x%x vs 0x%x), deleting first\n",
+            ExistingAttributes,
+            CachedVar->Attributes
+            ));
+          // Delete the existing variable first
+          gRT->SetVariable (
+            CachedVar->VariableName,
+            &CachedVar->VariableGuid,
+            0,
+            0,
+            NULL
+            );
+        }
+      }
+    }
+
+    // Set the EFI variable
+    Status = gRT->SetVariable (
+                    CachedVar->VariableName,
+                    &CachedVar->VariableGuid,
+                    CachedVar->Attributes,
+                    CachedVar->DataSize,
+                    CachedVar->Data
+                    );
+
+    if (EFI_ERROR (Status)) {
+      DEBUG ((
+        DEBUG_ERROR,
+        "BlSupportDxe: Failed to set variable (Name: %s, GUID: %g, Attr: 0x%x, Size: %d): %r\n",
+        CachedVar->VariableName,
+        &CachedVar->VariableGuid,
+        CachedVar->Attributes,
+        CachedVar->DataSize,
+        Status
+        ));
+    } else {
+      SuccessCount++;
+      DEBUG ((
+        DEBUG_INFO,
+        "BlSupportDxe: Successfully restored variable (Name: %s, GUID: %g, Attr: 0x%x, Size: %d)\n",
+        CachedVar->VariableName,
+        &CachedVar->VariableGuid,
+        CachedVar->Attributes,
+        CachedVar->DataSize
+        ));
+    }
   }
 
-  FdtBase = (VOID *)(UINTN)DeviceTree->DeviceTreeAddress;
-  if (FdtBase == NULL) {
-    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Invalid device tree address\n"));
-    return;
-  }
-
-  DEBUG ((DEBUG_INFO, "BlSupportDxe: Device tree found at 0x%p\n", FdtBase));
-
-  // Parse device tree and restore variables
-  Status = ParseDeviceTreeForVariables (FdtBase);
-  if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Failed to parse device tree: %r\n", Status));
-    return;
-  }
+  DEBUG ((DEBUG_INFO, "BlSupportDxe: Variable restoration completed: %d/%d successful\n", SuccessCount, mCachedVariableCount));
 
   mVariableRestoreDone = TRUE;
-  DEBUG ((DEBUG_INFO, "BlSupportDxe: Variable restoration completed\n"));
 
   // Close the event since we only need to restore once
   gBS->CloseEvent (Event);
@@ -473,7 +512,32 @@ BlDxeEntryPoint (
   ASSERT_EFI_ERROR (Status);
 
   //
-  // Register ExitBootServices event to restore variables from device tree
+  // Cache EFI variables from device tree during initialization
+  // This ensures the data is preserved before memory is reclaimed
+  //
+  {
+    EFI_HOB_GUID_TYPE              *GuidHob;
+    UNIVERSAL_PAYLOAD_DEVICE_TREE  *DeviceTree;
+    VOID                           *FdtBase;
+
+    GuidHob = GetFirstGuidHob (&gUniversalPayloadDeviceTreeGuid);
+    if (GuidHob != NULL) {
+      DeviceTree = (UNIVERSAL_PAYLOAD_DEVICE_TREE *)GET_GUID_HOB_DATA (GuidHob);
+      if (DeviceTree != NULL) {
+        FdtBase = (VOID *)(UINTN)DeviceTree->DeviceTreeAddress;
+        if (FdtBase != NULL) {
+          DEBUG ((DEBUG_INFO, "BlSupportDxe: Caching variables from device tree at 0x%p\n", FdtBase));
+          Status = CacheDeviceTreeVariables (FdtBase);
+          if (EFI_ERROR (Status)) {
+            DEBUG ((DEBUG_WARN, "BlSupportDxe: Failed to cache device tree variables: %r\n", Status));
+          }
+        }
+      }
+    }
+  }
+
+  //
+  // Register ExitBootServices event to restore variables from cached data
   // Variables are restored at ExitBootServices to avoid write protection issues
   //
   Status = gBS->CreateEventEx (

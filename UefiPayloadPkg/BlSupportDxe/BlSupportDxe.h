@@ -30,6 +30,17 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #define U_ROOT_EFIVAR_MAGIC  "u-root-efivar-v1"
 
+//
+// Structure to cache EFI variable data from device tree
+//
+typedef struct {
+  CHAR16      *VariableName;
+  EFI_GUID    VariableGuid;
+  UINT32      Attributes;
+  UINTN       DataSize;
+  VOID        *Data;
+} CACHED_VARIABLE_DATA;
+
 EFI_STATUS
 EFIAPI
 BlArchAdditionalOps (
