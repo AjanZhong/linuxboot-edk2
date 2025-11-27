@@ -20,26 +20,12 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <Library/IoLib.h>
 #include <Library/HobLib.h>
 #include <Library/BaseLib.h>
-#include <Library/FdtLib.h>
+#include <Library/PcdLib.h>
 
 #include <Guid/AcpiBoardInfoGuid.h>
 #include <Guid/GraphicsInfoHob.h>
 #include <Guid/EventGroup.h>
-#include <UniversalPayload/DeviceTree.h>
 #include <Protocol/Variable.h>
-
-#define U_ROOT_EFIVAR_MAGIC  "u-root-efivar-v1"
-
-//
-// Structure to cache EFI variable data from device tree
-//
-typedef struct {
-  CHAR16      *VariableName;
-  EFI_GUID    VariableGuid;
-  UINT32      Attributes;
-  UINTN       DataSize;
-  VOID        *Data;
-} CACHED_VARIABLE_DATA;
 
 EFI_STATUS
 EFIAPI

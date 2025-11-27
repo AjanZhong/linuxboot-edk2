@@ -31,6 +31,7 @@
 #include <Protocol/PciHostBridgeResourceAllocation.h>
 #include <Protocol/PciIo.h>
 #include <Guid/PciSegmentInfoGuid.h>
+#include <UniversalPayload/EfiVariable.h>
 
 typedef enum {
   ReservedMemory = 1,
@@ -39,6 +40,7 @@ typedef enum {
   PciRootBridge,
   Options,
   SerialPort,
+  EfiVariable,
   DoNothing
 } FDT_NODE_TYPE;
 
@@ -158,6 +160,8 @@ CheckNodeType (
     return PciRootBridge;
   } else if (AsciiStrCmp (NodeString, "options") == 0) {
     return Options;
+  } else if (AsciiStrnCmp (NodeString, "efivar@", AsciiStrLen ("efivar@")) == 0) {
+    return EfiVariable;
   } else {
     return DoNothing;
   }
@@ -663,6 +667,143 @@ ParseSerialPort (
 }
 
 /**
+  It will ParseEfiVariable node from FDT and create HOB for each variable.
+
+  @param[in]  Fdt               Address of the Fdt data.
+  @param[in]  Node              Node offset of the efivar@ node.
+**/
+VOID
+ParseEfiVariable (
+  IN VOID   *Fdt,
+  IN INT32  Node
+  )
+{
+  CONST FDT_PROPERTY              *PropertyPtr;
+  INT32                           TempLen;
+  CONST CHAR8                     *MagicStr;
+  CONST CHAR8                     *NameStr;
+  CONST CHAR8                     *GuidStr;
+  UINT32                          *AttributesPtr;
+  UINT32                          Attributes;
+  CONST UINT8                     *DataPtr;
+  UINT32                          DataSize;
+  UINT32                          NameSize;
+  EFI_GUID                        VariableGuid;
+  UNIVERSAL_PAYLOAD_EFI_VARIABLE  *EfiVarHob;
+  UINTN                           HobSize;
+  CHAR8                           *HobNamePtr;
+  UINT8                           *HobDataPtr;
+  RETURN_STATUS                   Status;
+
+  // Check for "magic" property to verify this is a u-root EFI variable node
+  PropertyPtr = FdtGetProperty (Fdt, Node, "magic", &TempLen);
+  if (PropertyPtr == NULL) {
+    DEBUG ((DEBUG_INFO, "ParseEfiVariable: No magic property found\n"));
+    return;
+  }
+
+  MagicStr = (CONST CHAR8 *)PropertyPtr->Data;
+  {
+    UINTN  MagicLen = AsciiStrLen (U_ROOT_EFIVAR_MAGIC);
+    if ((TempLen != MagicLen) && (TempLen != (MagicLen + 1))) {
+      DEBUG ((DEBUG_INFO, "ParseEfiVariable: Magic length mismatch\n"));
+      return;
+    }
+    if (AsciiStrnCmp (MagicStr, U_ROOT_EFIVAR_MAGIC, MagicLen) != 0) {
+      DEBUG ((DEBUG_INFO, "ParseEfiVariable: Magic value mismatch\n"));
+      return;
+    }
+  }
+
+  DEBUG ((DEBUG_INFO, "ParseEfiVariable: Found u-root EFI variable node\n"));
+
+  // Get variable name
+  PropertyPtr = FdtGetProperty (Fdt, Node, "name", &TempLen);
+  if (PropertyPtr == NULL) {
+    DEBUG ((DEBUG_ERROR, "ParseEfiVariable: Missing 'name' property\n"));
+    return;
+  }
+  NameStr = (CONST CHAR8 *)PropertyPtr->Data;
+  NameSize = (TempLen > 0 && NameStr[TempLen - 1] == '\0') ? TempLen : TempLen + 1;
+
+  // Get GUID
+  PropertyPtr = FdtGetProperty (Fdt, Node, "guid", &TempLen);
+  if (PropertyPtr == NULL) {
+    DEBUG ((DEBUG_ERROR, "ParseEfiVariable: Missing 'guid' property\n"));
+    return;
+  }
+  GuidStr = (CONST CHAR8 *)PropertyPtr->Data;
+
+  // Parse GUID string (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+  // Need to ensure null-termination for AsciiStrToGuid
+  {
+    CHAR8  TempGuidStr[37];
+    UINTN  CopyLen = (TempLen < 36) ? TempLen : 36;
+    CopyMem (TempGuidStr, GuidStr, CopyLen);
+    TempGuidStr[CopyLen] = '\0';
+    Status = AsciiStrToGuid (TempGuidStr, &VariableGuid);
+    if (RETURN_ERROR (Status)) {
+      DEBUG ((DEBUG_ERROR, "ParseEfiVariable: Invalid GUID format: %a\n", TempGuidStr));
+      return;
+    }
+  }
+
+  // Get attributes
+  PropertyPtr = FdtGetProperty (Fdt, Node, "attributes", &TempLen);
+  if (PropertyPtr == NULL) {
+    DEBUG ((DEBUG_ERROR, "ParseEfiVariable: Missing 'attributes' property\n"));
+    return;
+  }
+  AttributesPtr = (UINT32 *)PropertyPtr->Data;
+  Attributes = Fdt32ToCpu (*AttributesPtr);
+
+  // Get data
+  PropertyPtr = FdtGetProperty (Fdt, Node, "data", &TempLen);
+  if (PropertyPtr == NULL) {
+    DEBUG ((DEBUG_ERROR, "ParseEfiVariable: Missing 'data' property\n"));
+    return;
+  }
+  DataPtr = (CONST UINT8 *)PropertyPtr->Data;
+  DataSize = TempLen;
+
+  // Calculate HOB size: header + name (ASCII) + data
+  HobSize = sizeof (UNIVERSAL_PAYLOAD_EFI_VARIABLE) + NameSize + DataSize;
+
+  // Build the HOB
+  EfiVarHob = BuildGuidHob (&gUniversalPayloadEfiVariableGuid, HobSize);
+  if (EfiVarHob == NULL) {
+    DEBUG ((DEBUG_ERROR, "ParseEfiVariable: Failed to allocate HOB\n"));
+    return;
+  }
+
+  // Fill in the HOB
+  EfiVarHob->Header.Revision = UNIVERSAL_PAYLOAD_EFI_VARIABLE_REVISION;
+  EfiVarHob->Header.Length = (UINT16)HobSize;
+  CopyMem (&EfiVarHob->VariableGuid, &VariableGuid, sizeof (EFI_GUID));
+  EfiVarHob->Attributes = Attributes;
+  EfiVarHob->NameSize = NameSize;
+  EfiVarHob->DataSize = DataSize;
+
+  // Copy name (ensure null termination)
+  HobNamePtr = (CHAR8 *)(EfiVarHob + 1);
+  CopyMem (HobNamePtr, NameStr, NameSize - 1);
+  HobNamePtr[NameSize - 1] = '\0';
+
+  // Copy data
+  HobDataPtr = (UINT8 *)HobNamePtr + NameSize;
+  CopyMem (HobDataPtr, DataPtr, DataSize);
+
+  DEBUG ((
+    DEBUG_INFO,
+    "ParseEfiVariable: Created HOB for variable %a (GUID: %g, Attr: 0x%x, Size: %d)\n",
+    HobNamePtr,
+    &VariableGuid,
+    Attributes,
+    DataSize
+    ));
+}
+
+/**
   It will ParsePciRootBridge node from FDT.
 
   @param[in]  Fdt               Address of the Fdt data.
@@ -993,6 +1134,10 @@ ParseDtb (
         // correct options to feed into other init like PciEnumDone etc.
         DEBUG ((DEBUG_INFO, "ParseOptions\n"));
         ParseOptions (Fdt, Node, &PciEnumDone, &BootMode);
+        break;
+      case EfiVariable:
+        DEBUG ((DEBUG_INFO, "ParseEfiVariable\n"));
+        ParseEfiVariable (Fdt, Node);
         break;
       default:
         DEBUG ((DEBUG_INFO, "ParseNothing\n"));
