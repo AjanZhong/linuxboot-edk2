@@ -57,11 +57,11 @@
 [Guids]
   gUefiAcpiBoardInfoGuid
   gEfiGraphicsInfoHobGuid
-  gEfiEventExitBootServicesGuid
   gUniversalPayloadEfiVariableGuid
 
 [Protocols]
   gEfiCpuArchProtocolGuid
+  gEfiVariableWriteArchProtocolGuid            ## SOMETIMES_CONSUMES
 
 [Pcd]
   gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution

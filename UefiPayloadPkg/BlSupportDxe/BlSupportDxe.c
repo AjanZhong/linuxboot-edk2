@@ -8,6 +8,7 @@
 **/
 #include "BlSupportDxe.h"
 #include <UniversalPayload/EfiVariable.h>
+#include <Protocol/VariableWrite.h>
 
 /**
   Convert ASCII string to Unicode string.
@@ -47,8 +48,8 @@ AsciiToUnicodeString (
 }
 
 /**
-  Callback function for ExitBootServices event.
-  This function restores EFI variables from HOBs.
+  Callback function for VariableWriteArch protocol notification.
+  This function restores EFI variables from HOBs when variable services are ready.
 
   @param[in]  Event       Event whose notification function is being invoked.
   @param[in]  Context     Pointer to the notification function's context.
@@ -56,7 +57,7 @@ AsciiToUnicodeString (
 **/
 VOID
 EFIAPI
-OnExitBootServices (
+OnVariableWriteArchReady (
   IN EFI_EVENT  Event,
   IN VOID       *Context
   )
@@ -71,7 +72,7 @@ OnExitBootServices (
   UINTN                           SuccessCount;
   UINTN                           TotalCount;
 
-  DEBUG ((DEBUG_INFO, "BlSupportDxe: ExitBootServices event triggered, restoring variables from HOBs\n"));
+  DEBUG ((DEBUG_INFO, "BlSupportDxe: VariableWriteArch protocol ready, restoring variables from HOBs\n"));
 
   SuccessCount = 0;
   TotalCount = 0;
@@ -202,7 +203,8 @@ BlDxeEntryPoint (
   EFI_HOB_GUID_TYPE          *GuidHob;
   EFI_PEI_GRAPHICS_INFO_HOB  *GfxInfo;
   ACPI_BOARD_INFO            *AcpiBoardInfo;
-  EFI_EVENT                  ExitBootServicesEvent;
+  EFI_EVENT                  VariableWriteArchEvent;
+  VOID                       *Registration;
 
   //
   // Find the frame buffer information and update PCDs
@@ -236,19 +238,30 @@ BlDxeEntryPoint (
   ASSERT_EFI_ERROR (Status);
 
   //
-  // Register ExitBootServices event to restore variables from EfiVariable HOBs
-  // Variables are restored at ExitBootServices to avoid write protection issues
+  // Register protocol notify event to restore variables from EfiVariable HOBs
+  // Variables are restored when VariableWriteArch protocol is ready (before EndOfDxe)
+  // This allows us to modify VarCheck properties if needed
   //
-  Status = gBS->CreateEventEx (
+  Status = gBS->CreateEvent (
                   EVT_NOTIFY_SIGNAL,
                   TPL_CALLBACK,
-                  OnExitBootServices,
+                  OnVariableWriteArchReady,
                   NULL,
-                  &gEfiEventExitBootServicesGuid,
-                  &ExitBootServicesEvent
+                  &VariableWriteArchEvent
                   );
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Failed to create ExitBootServices event: %r\n", Status));
+    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Failed to create protocol notify event: %r\n", Status));
+    return Status;
+  }
+
+  Status = gBS->RegisterProtocolNotify (
+                  &gEfiVariableWriteArchProtocolGuid,
+                  VariableWriteArchEvent,
+                  &Registration
+                  );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "BlSupportDxe: Failed to register protocol notify: %r\n", Status));
+    gBS->CloseEvent (VariableWriteArchEvent);
     return Status;
   }
 
