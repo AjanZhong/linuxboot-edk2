@@ -663,7 +663,7 @@
 !endif
 
   ## Whether allows PCI RB to allocate DMA memory above 4GB
-  gUefiPayloadPkgTokenSpaceGuid.PcdPciAllocateMemoryAbove4GB|FALSE
+  gUefiPayloadPkgTokenSpaceGuid.PcdPciAllocateMemoryAbove4GB|TRUE
 
 [PcdsFixedAtBuild.AARCH64]
   # System Memory Base -- fixed at 0x4000_0000
@@ -676,9 +676,9 @@
   gArmPlatformTokenSpaceGuid.PcdSystemMemoryUefiRegionSize|0x04000000
 
   # ARM General Interrupt Controller
-  gArmTokenSpaceGuid.PcdGicDistributorBase|0x8000000
-  gArmTokenSpaceGuid.PcdGicRedistributorsBase|0x80a0000
-  gArmTokenSpaceGuid.PcdGicInterruptInterfaceBase|0x8080000
+  gArmTokenSpaceGuid.PcdGicDistributorBase|0x40060000
+  gArmTokenSpaceGuid.PcdGicRedistributorsBase|0x40080000
+  gArmTokenSpaceGuid.PcdGicInterruptInterfaceBase|0x40060000
 
   # Enable NX memory protection for all non-code regions, including OEM and OS
   # reserved ones, with the exception of LoaderData regions, of which OS loaders
@@ -762,7 +762,7 @@
   gUefiPayloadPkgTokenSpaceGuid.PcdFDTPageSize|8
 
   gEfiMdeModulePkgTokenSpaceGuid.PcdSerialUseMmio|TRUE
-  gEfiMdeModulePkgTokenSpaceGuid.PcdSerialRegisterBase|0x9000000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSerialRegisterBase|0x60000000
   gEfiMdeModulePkgTokenSpaceGuid.PcdSerialRegisterStride|1
   gEfiMdeModulePkgTokenSpaceGuid.PcdPciSerialParameters|$(PCI_SERIAL_PARAMETERS)
 
@@ -858,16 +858,18 @@
   gArmTokenSpaceGuid.PcdArmArchTimerSecIntrNum|29
   gArmTokenSpaceGuid.PcdArmArchTimerIntrNum|30
   # Not used in QEMU platform
-  gArmTokenSpaceGuid.PcdArmArchTimerVirtIntrNum|0
-  gArmTokenSpaceGuid.PcdArmArchTimerHypIntrNum|26
+  gArmTokenSpaceGuid.PcdArmArchTimerVirtIntrNum|27
+  ## Do not use Hyper Interrupt for QEMU SBSA platform
+  ## It leads to UEFI hangs at Arm Timer Dxe
+  gArmTokenSpaceGuid.PcdArmArchTimerHypIntrNum|0x0
   gArmTokenSpaceGuid.PcdArmArchTimerHypVirtIntrNum|0x0
 
   # PL031 RealTimeClock
-  gArmPlatformTokenSpaceGuid.PcdPL031RtcBase|0x9010000
+  gArmPlatformTokenSpaceGuid.PcdPL031RtcBase|0x60010000
 
-  gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0x4010000000
-  gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseSize|0xfffffff
-  gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation|0x0
+  gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0xf0000000
+  gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseSize|0x10000000
+  gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation|0x7fff0000
 
   gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution|1280
   gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution|800
