@@ -955,7 +955,7 @@
     UefiPayloadPkg/UefiPayloadEntry/UefiPayloadEntry.inf
   !endif
 !else
-  [Components.X64, Components.AARCH64]
+  [Components.X64, Components.AARCH64, Components.RISCV64]
   !if $(UNIVERSAL_PAYLOAD) == TRUE
     !if $(UNIVERSAL_PAYLOAD_FORMAT) == "ELF"
       UefiPayloadPkg/UefiPayloadEntry/UniversalPayloadEntry.inf
@@ -986,7 +986,7 @@
   !include NetworkPkg/Network.dsc.inc
 !endif
 
-[Components.X64, Components.AARCH64]
+[Components.X64, Components.AARCH64, Components.RISCV64]
   #
   # DXE Core
   #
@@ -1061,7 +1061,9 @@
 !if $(DISABLE_RESET_SYSTEM) == FALSE
   MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
 !endif
+!if "RISCV64" not in "$(ARCH)"
   PcAtChipsetPkg/PcatRealTimeClockRuntimeDxe/PcatRealTimeClockRuntimeDxe.inf
+!endif
 !if $(EMU_VARIABLE_ENABLE) == TRUE
   MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
 !endif
@@ -1086,7 +1088,12 @@
   MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
   MdeModulePkg/Universal/PlatformDriOverrideDxe/PlatformDriOverrideDxe.inf
+!if "RISCV64" not in "$(ARCH)"
+  #
+  # EbcDxe has no RISC-V interpreter.
+  #
   MdeModulePkg/Universal/EbcDxe/EbcDxe.inf
+!endif
 
   UefiPayloadPkg/BlSupportDxe/BlSupportDxe.inf
 
@@ -1310,6 +1317,11 @@
   # ACPI Support
   OvmfPkg/PlatformHasAcpiDtDxe/PlatformHasAcpiDtDxe.inf
 
+[Components.RISCV64]
+  UefiCpuPkg/CpuDxeRiscV64/CpuDxeRiscV64.inf
+  UefiCpuPkg/CpuTimerDxeRiscV64/CpuTimerDxeRiscV64.inf
+  EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
+
   #------------------------------
   #  Build the shell
   #------------------------------
@@ -1326,7 +1338,7 @@
   ShellLib|ShellPkg/Library/UefiShellLib/UefiShellLib.inf
   !include NetworkPkg/NetworkLibs.dsc.inc
 
-[Components.X64, Components.AARCH64]
+[Components.X64, Components.AARCH64, Components.RISCV64]
   ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf {
     <PcdsFixedAtBuild>
       ## This flag is used to control initialization of the shell library
